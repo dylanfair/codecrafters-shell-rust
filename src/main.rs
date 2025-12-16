@@ -12,6 +12,7 @@ fn main() {
         match trimmed_input.split_once(" ") {
             Some((command, arguments)) => match command {
                 "echo" => println!("{}", arguments),
+                "type" => type_fn(arguments),
                 _ => println!("{}: command not found", command),
             },
             None => match trimmed_input {
@@ -19,5 +20,12 @@ fn main() {
                 _ => println!("{}: command not found", trimmed_input),
             },
         }
+    }
+}
+
+fn type_fn(command: &str) {
+    match command {
+        "echo" | "type" | "exit" => println!("{} is a shell builtin", command),
+        _ => println!("{}: not found", command),
     }
 }
