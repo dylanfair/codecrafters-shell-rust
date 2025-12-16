@@ -8,12 +8,15 @@ fn main() {
 
         let mut command = String::new();
         io::stdin().read_line(&mut command).unwrap();
-        let trimmed_command = command.trim();
-
-        if trimmed_command == "exit" {
-            break;
+        match command.trim().split_once(" ") {
+            Some((command, arguments)) => match command {
+                "echo" => println!("{}", arguments),
+                _ => println!("{}: command not found", command),
+            },
+            None => match command.trim() {
+                "exit" => break,
+                _ => println!("{}: command not found", command),
+            },
         }
-
-        println!("{}: command not found", trimmed_command);
     }
 }
