@@ -22,10 +22,17 @@ fn main() -> Result<()> {
             },
             None => match trimmed_input {
                 "exit" => break,
+                "pwd" => pwd_fn()?,
                 _ => run_program(trimmed_input, None)?,
             },
         }
     }
+    Ok(())
+}
+
+fn pwd_fn() -> Result<()> {
+    let current_dir = env::current_dir()?;
+    println!("{}", current_dir.display());
     Ok(())
 }
 
