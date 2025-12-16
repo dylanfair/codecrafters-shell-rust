@@ -51,6 +51,6 @@ fn path_search(command: &str) -> Result<()> {
             }
         }
     }
-    println!("{}: command not found", command);
+    println!("{}: not found", command);
     Ok(())
 }
