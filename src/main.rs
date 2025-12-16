@@ -34,6 +34,12 @@ fn main() -> Result<()> {
 fn cd_fn(directory: Option<&str>) -> Result<()> {
     match directory {
         Some(dir) => {
+            if dir == "~" {
+                let home_dir = env::var("HOME")?;
+                env::set_current_dir(home_dir)?;
+                return Ok(());
+            }
+
             let path = Path::new(dir);
             if path.exists() {
                 env::set_current_dir(path)?;
