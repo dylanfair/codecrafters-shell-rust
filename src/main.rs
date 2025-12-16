@@ -38,7 +38,7 @@ fn pwd_fn() -> Result<()> {
 
 fn type_fn(command: &str) -> Result<()> {
     match command {
-        "echo" | "type" | "exit" => println!("{} is a shell builtin", command),
+        "echo" | "type" | "exit" | "pwd" => println!("{} is a shell builtin", command),
         _ => {
             let _ = path_search(command, true)?;
         }
