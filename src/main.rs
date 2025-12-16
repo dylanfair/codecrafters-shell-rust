@@ -18,6 +18,7 @@ fn main() -> Result<()> {
             Some((command, arguments)) => match command {
                 "echo" => println!("{}", arguments),
                 "type" => type_fn(arguments)?,
+                "cd" => cd_fn(Some(arguments))?,
                 _ => run_program(command, Some(arguments))?,
             },
             None => match trimmed_input {
@@ -30,6 +31,21 @@ fn main() -> Result<()> {
     Ok(())
 }
 
+fn cd_fn(directory: Option<&str>) -> Result<()> {
+    match directory {
+        Some(dir) => {
+            let path = Path::new(dir);
+            if path.exists() {
+                env::set_current_dir(path)?;
+            } else {
+                println!("cd: {}: No such file or directory", dir);
+            }
+        }
+        None => println!("No file or directory passed into cd"),
+    }
+    Ok(())
+}
+
 fn pwd_fn() -> Result<()> {
     let current_dir = env::current_dir()?;
     println!("{}", current_dir.display());
@@ -38,7 +54,7 @@ fn pwd_fn() -> Result<()> {
 
 fn type_fn(command: &str) -> Result<()> {
     match command {
-        "echo" | "type" | "exit" | "pwd" => println!("{} is a shell builtin", command),
+        "echo" | "type" | "exit" | "pwd" | "cd" => println!("{} is a shell builtin", command),
         _ => {
             let _ = path_search(command, true)?;
         }
