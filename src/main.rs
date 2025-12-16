@@ -47,8 +47,8 @@ fn path_search(command: &str) -> Result<()> {
             let is_executable = permissions.mode() & 0o111 != 0;
             if is_executable {
                 println!("{} is {}", command, path.display());
+                return Ok(());
             }
-            return Ok(());
         }
     }
     println!("{}: command not found", command);
