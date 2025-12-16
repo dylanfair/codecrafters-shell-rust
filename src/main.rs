@@ -65,12 +65,12 @@ fn path_search(command: &str, verbose: bool) -> Result<Option<PathBuf>> {
 fn run_program(command: &str, arguments: Option<&str>) -> Result<()> {
     let exc_path = path_search(command, false)?;
     match exc_path {
-        Some(exc_path) => {
+        Some(_) => {
             if let Some(arguments) = arguments {
-                let mut handle = Command::new(exc_path).args(arguments.split(" ")).spawn()?;
+                let mut handle = Command::new(command).args(arguments.split(" ")).spawn()?;
                 handle.wait()?;
             } else {
-                let mut handle = Command::new(exc_path).spawn()?;
+                let mut handle = Command::new(command).spawn()?;
                 handle.wait()?;
             }
         }
