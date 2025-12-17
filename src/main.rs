@@ -38,12 +38,19 @@ fn main() -> Result<()> {
 fn parse_args(arguments: &str) -> Vec<String> {
     let mut parsed_arguments = vec![];
     let mut single_quotes = false;
+    let mut double_quotes = false;
     let mut word = String::new();
     for (i, char) in arguments.chars().enumerate() {
         if char == '\'' {
-            single_quotes = !single_quotes;
+            if !double_quotes {
+                single_quotes = !single_quotes;
+            } else {
+                word.push(char);
+            }
+        } else if char == '"' {
+            double_quotes = !double_quotes;
         } else if char == ' ' {
-            if single_quotes {
+            if single_quotes || double_quotes {
                 word.push(char);
             } else if !word.is_empty() {
                 parsed_arguments.push(word.clone());
