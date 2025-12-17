@@ -45,9 +45,6 @@ fn parse_args(arguments: &str) -> Vec<String> {
         match char {
             '\'' => {
                 if double_quotes || escape {
-                    if double_quotes && escape {
-                        word.pop();
-                    }
                     word.push(char);
                 } else {
                     single_quotes = !single_quotes;
