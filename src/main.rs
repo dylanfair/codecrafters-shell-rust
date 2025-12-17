@@ -49,7 +49,7 @@ fn parse_args(arguments: &str) -> Vec<String> {
                 single_quotes = !single_quotes;
             }
         } else if char == '"' {
-            if escape {
+            if escape || single_quotes {
                 word.push(char);
             } else {
                 double_quotes = !double_quotes;
