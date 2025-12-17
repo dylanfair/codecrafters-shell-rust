@@ -42,34 +42,63 @@ fn parse_args(arguments: &str) -> Vec<String> {
     let mut escape = false;
     let mut word = String::new();
     for char in arguments.chars() {
-        if char == '\'' {
-            if double_quotes || escape {
-                word.push(char);
-            } else {
-                single_quotes = !single_quotes;
+        match char {
+            '\'' => {
+                if double_quotes || escape {
+                    if double_quotes && escape {
+                        word.pop();
+                    }
+                    word.push(char);
+                } else {
+                    single_quotes = !single_quotes;
+                }
             }
-        } else if char == '"' {
-            if escape || single_quotes {
-                word.push(char);
-            } else {
-                double_quotes = !double_quotes;
+            '"' => {
+                if escape && double_quotes {
+                    word.pop();
+                    word.push(char);
+                } else if escape || single_quotes {
+                    word.push(char);
+                } else {
+                    double_quotes = !double_quotes;
+                }
             }
-        } else if char == '\\' {
-            if escape || double_quotes || single_quotes {
-                word.push(char);
-            } else {
-                escape = !escape;
-                continue;
+            '\\' => {
+                if escape && double_quotes {
+                    word.pop();
+                    word.push(char);
+                } else if single_quotes {
+                    word.push(char);
+                } else if double_quotes {
+                    word.push(char);
+                    escape = !escape;
+                    continue;
+                } else {
+                    escape = !escape;
+                    continue;
+                }
             }
-        } else if char == ' ' {
-            if single_quotes || double_quotes || escape {
-                word.push(char);
-            } else if !word.is_empty() {
-                parsed_arguments.push(word.clone());
-                word = String::new();
+            ' ' => {
+                if single_quotes || double_quotes || escape {
+                    word.push(char);
+                } else if !word.is_empty() {
+                    parsed_arguments.push(word.clone());
+                    word = String::new();
+                }
             }
-        } else {
-            word.push(char);
+            _ => {
+                if double_quotes && escape {
+                    match char {
+                        '$' | '`' | '\n' => {
+                            word.pop();
+                            word.push(char);
+                        }
+                        _ => word.push(char),
+                    }
+                } else {
+                    word.push(char);
+                }
+            }
         }
         escape = false;
     }
