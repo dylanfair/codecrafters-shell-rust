@@ -39,18 +39,29 @@ fn parse_args(arguments: &str) -> Vec<String> {
     let mut parsed_arguments = vec![];
     let mut single_quotes = false;
     let mut double_quotes = false;
+    let mut escape = false;
     let mut word = String::new();
-    for (i, char) in arguments.chars().enumerate() {
+    for char in arguments.chars() {
         if char == '\'' {
-            if !double_quotes {
+            if !double_quotes && !escape {
                 single_quotes = !single_quotes;
             } else {
                 word.push(char);
             }
         } else if char == '"' {
+            if escape {
+                word.push(char);
+            }
             double_quotes = !double_quotes;
+        } else if char == '\\' {
+            if escape {
+                word.push(char);
+            } else {
+                escape = !escape;
+                continue;
+            }
         } else if char == ' ' {
-            if single_quotes || double_quotes {
+            if single_quotes || double_quotes || escape {
                 word.push(char);
             } else if !word.is_empty() {
                 parsed_arguments.push(word.clone());
@@ -59,9 +70,11 @@ fn parse_args(arguments: &str) -> Vec<String> {
         } else {
             word.push(char);
         }
-        if i == arguments.len() - 1 {
-            parsed_arguments.push(word.clone());
-        }
+        escape = false;
+    }
+    // push in whatever the last word was
+    if !word.is_empty() {
+        parsed_arguments.push(word.clone());
     }
     parsed_arguments
 }
