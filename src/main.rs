@@ -54,7 +54,7 @@ fn parse_args(arguments: &str) -> Vec<String> {
             }
             double_quotes = !double_quotes;
         } else if char == '\\' {
-            if escape {
+            if escape || double_quotes || single_quotes {
                 word.push(char);
             } else {
                 escape = !escape;
