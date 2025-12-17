@@ -17,7 +17,6 @@ fn main() -> Result<()> {
         match trimmed_input.split_once(" ") {
             Some((command, arguments)) => {
                 let parsed_args = parse_args(arguments);
-                println!("{:?}", parsed_args);
                 match command {
                     "echo" => println!("{}", parsed_args.join(" ")),
                     "type" => type_fn(&parsed_args.join(" "))?,
