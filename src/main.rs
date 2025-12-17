@@ -43,16 +43,17 @@ fn parse_args(arguments: &str) -> Vec<String> {
     let mut word = String::new();
     for char in arguments.chars() {
         if char == '\'' {
-            if !double_quotes && !escape {
-                single_quotes = !single_quotes;
-            } else {
+            if double_quotes || escape {
                 word.push(char);
+            } else {
+                single_quotes = !single_quotes;
             }
         } else if char == '"' {
             if escape {
                 word.push(char);
+            } else {
+                double_quotes = !double_quotes;
             }
-            double_quotes = !double_quotes;
         } else if char == '\\' {
             if escape || double_quotes || single_quotes {
                 word.push(char);
