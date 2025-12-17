@@ -15,15 +15,20 @@ fn main() -> Result<()> {
         io::stdin().read_line(&mut input).unwrap();
         let trimmed_input = input.trim();
         match trimmed_input.split_once(" ") {
-            Some((command, arguments)) => match command {
-                "echo" => println!("{}", arguments),
-                "type" => type_fn(arguments)?,
-                "cd" => cd_fn(Some(arguments))?,
-                _ => run_program(command, Some(arguments))?,
-            },
+            Some((command, arguments)) => {
+                let parsed_args = parse_args(arguments);
+                println!("{:?}", parsed_args);
+                match command {
+                    "echo" => println!("{}", parsed_args.join(" ")),
+                    "type" => type_fn(&parsed_args.join(" "))?,
+                    "cd" => cd_fn(Some(parsed_args))?,
+                    _ => run_program(command, Some(parsed_args))?,
+                }
+            }
             None => match trimmed_input {
                 "exit" => break,
                 "pwd" => pwd_fn()?,
+                "" => {}
                 _ => run_program(trimmed_input, None)?,
             },
         }
@@ -31,9 +36,36 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn cd_fn(directory: Option<&str>) -> Result<()> {
+fn parse_args(arguments: &str) -> Vec<String> {
+    let mut parsed_arguments = vec![];
+    let mut single_quotes = false;
+    let mut word = String::new();
+    for (i, char) in arguments.chars().enumerate() {
+        if char == '\'' {
+            single_quotes = !single_quotes;
+        } else if char == ' ' {
+            if single_quotes {
+                word.push(char);
+            } else if !word.is_empty() {
+                parsed_arguments.push(word.clone());
+                word = String::new();
+            }
+        } else {
+            word.push(char);
+        }
+        if i == arguments.len() - 1 {
+            parsed_arguments.push(word.clone());
+        }
+    }
+    parsed_arguments
+}
+
+fn cd_fn(directory: Option<Vec<String>>) -> Result<()> {
     match directory {
         Some(dir) => {
+            let dir = dir
+                .first()
+                .expect("There should be something passed in by this point");
             if dir == "~" {
                 let home_dir = env::var("HOME")?;
                 env::set_current_dir(home_dir)?;
@@ -91,12 +123,12 @@ fn path_search(command: &str, verbose: bool) -> Result<Option<PathBuf>> {
     Ok(None)
 }
 
-fn run_program(command: &str, arguments: Option<&str>) -> Result<()> {
+fn run_program(command: &str, arguments: Option<Vec<String>>) -> Result<()> {
     let exc_path = path_search(command, false)?;
     match exc_path {
         Some(_) => {
             if let Some(arguments) = arguments {
-                let mut handle = Command::new(command).args(arguments.split(" ")).spawn()?;
+                let mut handle = Command::new(command).args(arguments).spawn()?;
                 handle.wait()?;
             } else {
                 let mut handle = Command::new(command).spawn()?;
