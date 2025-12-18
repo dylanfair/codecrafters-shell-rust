@@ -1,5 +1,6 @@
 use std::env;
 use std::io::{self, Write};
+use std::ops::Deref;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -16,26 +17,37 @@ fn main() -> Result<()> {
         let trimmed_input = input.trim();
         match trimmed_input.split_once(" ") {
             Some((command, arguments)) => {
-                let parsed_args = parse_args(arguments);
-                match command {
+                let parsed_input = parse_input(command);
+                let parsed_command = parsed_input
+                    .first()
+                    .expect("We should always have a command here")
+                    .deref();
+                let parsed_args = parse_input(arguments);
+
+                match parsed_command {
                     "echo" => println!("{}", parsed_args.join(" ")),
                     "type" => type_fn(&parsed_args.join(" "))?,
                     "cd" => cd_fn(Some(parsed_args))?,
-                    _ => run_program(command, Some(parsed_args))?,
+                    _ => run_program(parsed_command, Some(parsed_args))?,
                 }
             }
-            None => match trimmed_input {
-                "exit" => break,
-                "pwd" => pwd_fn()?,
-                "" => {}
-                _ => run_program(trimmed_input, None)?,
-            },
+            None => {
+                let parsed_input = parse_input(trimmed_input);
+                if let Some(parsed_command) = parsed_input.first() {
+                    match parsed_command.deref() {
+                        "exit" => break,
+                        "pwd" => pwd_fn()?,
+                        "" => {}
+                        _ => run_program(parsed_command, None)?,
+                    }
+                }
+            }
         }
     }
     Ok(())
 }
 
-fn parse_args(arguments: &str) -> Vec<String> {
+fn parse_input(arguments: &str) -> Vec<String> {
     let mut parsed_arguments = vec![];
     let mut single_quotes = false;
     let mut double_quotes = false;
