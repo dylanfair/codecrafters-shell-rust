@@ -14,35 +14,67 @@ fn main() -> Result<()> {
 
         let mut input = String::new();
         io::stdin().read_line(&mut input).unwrap();
-        let trimmed_input = input.trim();
-        match trimmed_input.split_once(" ") {
-            Some((command, arguments)) => {
-                let parsed_input = parse_input(command);
-                let parsed_command = parsed_input
-                    .first()
-                    .expect("We should always have a command here")
-                    .deref();
-                let parsed_args = parse_input(arguments);
 
-                match parsed_command {
-                    "echo" => println!("{}", parsed_args.join(" ")),
-                    "type" => type_fn(&parsed_args.join(" "))?,
-                    "cd" => cd_fn(Some(parsed_args))?,
-                    _ => run_program(parsed_command, Some(parsed_args))?,
+        let mut parsed_input = parse_input(input.trim());
+        if parsed_input.is_empty() {
+            continue;
+        }
+
+        if parsed_input.len() == 1 {
+            if let Some(parsed_command) = parsed_input.first() {
+                match parsed_command.deref() {
+                    "exit" => break,
+                    "pwd" => pwd_fn()?,
+                    "" => {}
+                    _ => run_program(parsed_command, None)?,
                 }
             }
-            None => {
-                let parsed_input = parse_input(trimmed_input);
-                if let Some(parsed_command) = parsed_input.first() {
-                    match parsed_command.deref() {
-                        "exit" => break,
-                        "pwd" => pwd_fn()?,
-                        "" => {}
-                        _ => run_program(parsed_command, None)?,
-                    }
-                }
+        } else {
+            // let parsed_command = parsed_input
+            //     .first()
+            //     .expect("We should always have a command here")
+            //     .deref()
+            //     .clone();
+            // let parsed_args = parse_input(arguments);
+            // let parsed_args = parsed_input.into_iter().skip(1).collect::<Vec<String>>();
+            let parsed_command = parsed_input.remove(0);
+
+            match parsed_command.deref() {
+                "echo" => println!("{}", parsed_input.join(" ")),
+                "type" => type_fn(&parsed_input.join(" "))?,
+                "cd" => cd_fn(Some(parsed_input))?,
+                _ => run_program(&parsed_command, Some(parsed_input))?,
             }
         }
+
+        // match trimmed_input.split_once(" ") {
+        //     Some((command, arguments)) => {
+        //         let parsed_input = parse_input(command);
+        //         let parsed_command = parsed_input
+        //             .first()
+        //             .expect("We should always have a command here")
+        //             .deref();
+        //         let parsed_args = parse_input(arguments);
+        //
+        //         match parsed_command {
+        //             "echo" => println!("{}", parsed_args.join(" ")),
+        //             "type" => type_fn(&parsed_args.join(" "))?,
+        //             "cd" => cd_fn(Some(parsed_args))?,
+        //             _ => run_program(parsed_command, Some(parsed_args))?,
+        //         }
+        //     }
+        //     None => {
+        //         let parsed_input = parse_input(trimmed_input);
+        //         if let Some(parsed_command) = parsed_input.first() {
+        //             match parsed_command.deref() {
+        //                 "exit" => break,
+        //                 "pwd" => pwd_fn()?,
+        //                 "" => {}
+        //                 _ => run_program(parsed_command, None)?,
+        //             }
+        //         }
+        //     }
+        // }
     }
     Ok(())
 }
