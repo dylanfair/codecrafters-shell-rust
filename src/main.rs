@@ -292,7 +292,7 @@ fn path_search(
         }
     }
     if verbose {
-        let not_found = format!("{}: Not found\n", command);
+        let not_found = format!("{}: not found\n", command);
         match redirect {
             Redirect::Stderr => {
                 let buffer = buf.expect("If redirecting we should have a file buffer");
