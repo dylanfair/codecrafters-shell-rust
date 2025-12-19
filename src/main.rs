@@ -1,11 +1,20 @@
 use std::env;
-use std::io::{self, Write};
+use std::fs::{File, OpenOptions};
+use std::io::{self, BufWriter, Read, Write};
 use std::ops::Deref;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
 
 use anyhow::Result;
+
+const PIPES: [&str; 6] = ["1>", ">", "2>", "1>>", ">>", "2>>"];
+
+enum Redirect {
+    Stdout,
+    Stderr,
+    None,
+}
 
 fn main() -> Result<()> {
     loop {
@@ -26,55 +35,89 @@ fn main() -> Result<()> {
                     "exit" => break,
                     "pwd" => pwd_fn()?,
                     "" => {}
-                    _ => run_program(parsed_command, None)?,
+                    _ => run_program(parsed_command, None, &mut None, &Redirect::None)?,
                 }
             }
         } else {
-            // let parsed_command = parsed_input
-            //     .first()
-            //     .expect("We should always have a command here")
-            //     .deref()
-            //     .clone();
-            // let parsed_args = parse_input(arguments);
-            // let parsed_args = parsed_input.into_iter().skip(1).collect::<Vec<String>>();
             let parsed_command = parsed_input.remove(0);
 
-            match parsed_command.deref() {
-                "echo" => println!("{}", parsed_input.join(" ")),
-                "type" => type_fn(&parsed_input.join(" "))?,
-                "cd" => cd_fn(Some(parsed_input))?,
-                _ => run_program(&parsed_command, Some(parsed_input))?,
+            if let Some((i, pipe)) = parsed_input
+                .iter()
+                .enumerate()
+                .find(|(_, v)| PIPES.contains(&v.as_str()))
+            {
+                let pipe_target = match parsed_input.get(i + 1) {
+                    Some(target) => target,
+                    None => {
+                        println!("No pipe target found");
+                        continue;
+                    }
+                };
+
+                let mut redirect = Redirect::None;
+                let mut fileoptions = OpenOptions::new();
+                match pipe.as_str() {
+                    ">" | "1>" => {
+                        redirect = Redirect::Stdout;
+                        fileoptions.write(true).create(true);
+                    }
+                    ">>" | "1>>" => {
+                        redirect = Redirect::Stdout;
+                        fileoptions.write(true).append(true);
+                    }
+                    "2>" => {
+                        redirect = Redirect::Stderr;
+                        fileoptions.write(true).create(true);
+                    }
+                    "2>>" => {
+                        redirect = Redirect::Stderr;
+                        fileoptions.write(true).append(true);
+                    }
+                    _ => {}
+                };
+
+                let file = fileoptions.open(pipe_target)?;
+                let mut buffer = BufWriter::new(file);
+
+                let args = parsed_input.drain(0..i).collect::<Vec<String>>();
+                match parsed_command.deref() {
+                    "echo" => {
+                        let mut echo = args.join(" ");
+                        match redirect {
+                            Redirect::Stdout => {
+                                echo.push('\n');
+                                buffer.write_all(echo.as_bytes())?;
+                            }
+                            _ => println!("{echo}"),
+                        }
+                    }
+                    "type" => type_fn(&args.join(" "), Some(&mut buffer), redirect)?,
+                    "cd" => cd_fn(Some(args), Some(&mut buffer), redirect)?,
+                    _ => run_program(
+                        &parsed_command,
+                        Some(args),
+                        &mut Some(&mut buffer),
+                        &redirect,
+                    )?,
+                }
+
+                buffer.flush()?;
+            } else {
+                match parsed_command.deref() {
+                    "echo" => println!("{}", parsed_input.join(" ")),
+                    "type" => type_fn(&parsed_input.join(" "), None, Redirect::None)?,
+                    "cd" => cd_fn(Some(parsed_input), None, Redirect::None)?,
+                    _ => {
+                        run_program(
+                            &parsed_command,
+                            Some(parsed_input),
+                            &mut None,
+                            &Redirect::None,
+                        )?;
+                    }
+                }
             }
         }
-
-        // match trimmed_input.split_once(" ") {
-        //     Some((command, arguments)) => {
-        //         let parsed_input = parse_input(command);
-        //         let parsed_command = parsed_input
-        //             .first()
-        //             .expect("We should always have a command here")
-        //             .deref();
-        //         let parsed_args = parse_input(arguments);
-        //
-        //         match parsed_command {
-        //             "echo" => println!("{}", parsed_args.join(" ")),
-        //             "type" => type_fn(&parsed_args.join(" "))?,
-        //             "cd" => cd_fn(Some(parsed_args))?,
-        //             _ => run_program(parsed_command, Some(parsed_args))?,
-        //         }
-        //     }
-        //     None => {
-        //         let parsed_input = parse_input(trimmed_input);
-        //         if let Some(parsed_command) = parsed_input.first() {
-        //             match parsed_command.deref() {
-        //                 "exit" => break,
-        //                 "pwd" => pwd_fn()?,
-        //                 "" => {}
-        //                 _ => run_program(parsed_command, None)?,
-        //             }
-        //         }
-        //     }
-        // }
     }
     Ok(())
 }
@@ -150,7 +193,11 @@ fn parse_input(arguments: &str) -> Vec<String> {
     parsed_arguments
 }
 
-fn cd_fn(directory: Option<Vec<String>>) -> Result<()> {
+fn cd_fn(
+    directory: Option<Vec<String>>,
+    buf: Option<&mut BufWriter<File>>,
+    redirect: Redirect,
+) -> Result<()> {
     match directory {
         Some(dir) => {
             let dir = dir
@@ -166,10 +213,26 @@ fn cd_fn(directory: Option<Vec<String>>) -> Result<()> {
             if path.exists() {
                 env::set_current_dir(path)?;
             } else {
-                println!("cd: {}: No such file or directory", dir);
+                let no_file_fail = format!("cd: {}: No such file or directory\n", dir);
+                match redirect {
+                    Redirect::Stderr => {
+                        let buffer = buf.expect("If redirecting we should have a file buffer");
+                        buffer.write_all(no_file_fail.as_bytes())?;
+                    }
+                    _ => print!("{no_file_fail}"),
+                }
             }
         }
-        None => println!("No file or directory passed into cd"),
+        None => {
+            let no_file_passed_in = "No file or directory passed into cd\n";
+            match redirect {
+                Redirect::Stderr => {
+                    let buffer = buf.expect("If redirecting we should have a file buffer");
+                    buffer.write_all(no_file_passed_in.as_bytes())?;
+                }
+                _ => print!("{no_file_passed_in}"),
+            }
+        }
     }
     Ok(())
 }
@@ -180,17 +243,31 @@ fn pwd_fn() -> Result<()> {
     Ok(())
 }
 
-fn type_fn(command: &str) -> Result<()> {
+fn type_fn(command: &str, buf: Option<&mut BufWriter<File>>, redirect: Redirect) -> Result<()> {
     match command {
-        "echo" | "type" | "exit" | "pwd" | "cd" => println!("{} is a shell builtin", command),
+        "echo" | "type" | "exit" | "pwd" | "cd" => {
+            let shell_builtin = format!("{} is a shell builtin\n", command);
+            match redirect {
+                Redirect::Stdout => {
+                    let buffer = buf.expect("If redirecting we should have a file buffer");
+                    buffer.write_all(shell_builtin.as_bytes())?;
+                }
+                _ => print!("{shell_builtin}"),
+            }
+        }
         _ => {
-            let _ = path_search(command, true)?;
+            let _ = path_search(command, true, buf, &redirect)?;
         }
     }
     Ok(())
 }
 
-fn path_search(command: &str, verbose: bool) -> Result<Option<PathBuf>> {
+fn path_search(
+    command: &str,
+    verbose: bool,
+    buf: Option<&mut BufWriter<File>>,
+    redirect: &Redirect,
+) -> Result<Option<PathBuf>> {
     let path = env::var("PATH").unwrap();
     let dirs = path.split(":");
     for dir in dirs {
@@ -201,31 +278,93 @@ fn path_search(command: &str, verbose: bool) -> Result<Option<PathBuf>> {
             let is_executable = permissions.mode() & 0o111 != 0;
             if is_executable {
                 if verbose {
-                    println!("{} is {}", command, path.display());
+                    let exe_is_path = format!("{} is {}\n", command, path.display());
+                    match redirect {
+                        Redirect::Stdout => {
+                            let buffer = buf.expect("If redirecting we should have a file buffer");
+                            buffer.write_all(exe_is_path.as_bytes())?;
+                        }
+                        _ => print!("{exe_is_path}"),
+                    }
                 }
                 return Ok(Some(path.to_path_buf()));
             }
         }
     }
     if verbose {
-        println!("{}: not found", command);
+        let not_found = format!("{}: Not found\n", command);
+        match redirect {
+            Redirect::Stderr => {
+                let buffer = buf.expect("If redirecting we should have a file buffer");
+                buffer.write_all(not_found.as_bytes())?
+            }
+            _ => print!("{not_found}"),
+        }
     }
     Ok(None)
 }
 
-fn run_program(command: &str, arguments: Option<Vec<String>>) -> Result<()> {
-    let exc_path = path_search(command, false)?;
+fn run_program(
+    command: &str,
+    arguments: Option<Vec<String>>,
+    buf: &mut Option<&mut BufWriter<File>>,
+    redirect: &Redirect,
+) -> Result<()> {
+    let exc_path = path_search(command, false, buf.as_deref_mut(), redirect)?;
     match exc_path {
         Some(_) => {
-            if let Some(arguments) = arguments {
-                let mut handle = Command::new(command).args(arguments).spawn()?;
-                handle.wait()?;
+            let mut cmd = Command::new(command);
+            match redirect {
+                Redirect::Stdout => cmd.stdout(Stdio::piped()),
+                Redirect::Stderr => cmd.stderr(Stdio::piped()),
+                Redirect::None => cmd.stdout(Stdio::inherit()),
+            };
+
+            let mut handle = if let Some(arguments) = arguments {
+                cmd.args(arguments).spawn()?
             } else {
-                let mut handle = Command::new(command).spawn()?;
-                handle.wait()?;
+                cmd.spawn()?
+            };
+
+            let mut output = Vec::new();
+            match redirect {
+                Redirect::Stdout => {
+                    let buffer = buf
+                        .as_deref_mut()
+                        .expect("If redirecting we should have a file buffer");
+                    let mut stdout = handle.stdout.take().expect("Should have an output");
+                    stdout.read_to_end(&mut output)?;
+                    buffer.write_all(&output)?;
+
+                    return Ok(());
+                }
+                Redirect::Stderr => {
+                    let buffer = buf
+                        .as_deref_mut()
+                        .expect("If redirecting we should have a file buffer");
+                    let mut stderr = handle.stderr.take().expect("Should have an err");
+                    stderr.read_to_end(&mut output)?;
+                    buffer.write_all(&output)?;
+
+                    return Ok(());
+                }
+                Redirect::None => {
+                    handle.wait()?;
+                }
             }
         }
-        None => println!("{}: command not found", command),
+        None => {
+            let command_not_found = format!("{}: command not found\n", command);
+            match redirect {
+                Redirect::Stderr => {
+                    let buffer = buf
+                        .as_deref_mut()
+                        .expect("If redirecting we should have a file buffer");
+                    buffer.write_all(command_not_found.as_bytes())?;
+                }
+                _ => print!("{command_not_found}"),
+            }
+        }
     }
     Ok(())
 }
