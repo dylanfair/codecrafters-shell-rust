@@ -63,7 +63,7 @@ fn main() -> Result<()> {
                     }
                     ">>" | "1>>" => {
                         redirect = Redirect::Stdout;
-                        fileoptions.write(true).append(true);
+                        fileoptions.write(true).create(true).append(true);
                     }
                     "2>" => {
                         redirect = Redirect::Stderr;
@@ -71,7 +71,7 @@ fn main() -> Result<()> {
                     }
                     "2>>" => {
                         redirect = Redirect::Stderr;
-                        fileoptions.write(true).append(true);
+                        fileoptions.write(true).create(true).append(true);
                     }
                     _ => {}
                 };
