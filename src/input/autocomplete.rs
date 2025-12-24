@@ -13,7 +13,10 @@ pub fn autocomplete(current_input: &mut String) {
             }
             current_input.push(' ');
             print!(" ");
+            io::stdout().flush().expect("Could not flush autocomplete");
+            return;
         }
     }
-    io::stdout().flush().expect("Could not flush autocomplete");
+    print!("\x07");
+    io::stdout().flush().expect("Could not flush bell");
 }
