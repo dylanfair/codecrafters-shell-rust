@@ -59,6 +59,16 @@ pub fn autocomplete(current_input: &mut String) -> Result<()> {
     } else if potential_matches.len() > 1 {
         print!("\x07");
         io::stdout().flush().expect("Could not flush bell");
+
+        let longest_common_prefix = find_longest_common_prefix(&potential_matches, current_input);
+        if !longest_common_prefix.is_empty() {
+            current_input.push_str(&longest_common_prefix);
+            print!("{longest_common_prefix}");
+            io::stdout()
+                .flush()
+                .expect("Could not flush longest_common_prefix");
+        }
+
         if let Ok(Event::Key(key_event)) = read()
             && key_event.code == KeyCode::Tab
         {
@@ -77,4 +87,30 @@ pub fn autocomplete(current_input: &mut String) -> Result<()> {
     }
 
     Ok(())
+}
+
+fn find_longest_common_prefix(potential_matches: &[String], current_input: &str) -> String {
+    let mut longest_common_prefix = String::new();
+    let mut current_char_place = current_input.len();
+
+    'outer: loop {
+        let mut current_char = '\0';
+        for i in 0..potential_matches.len() {
+            let pmatch = potential_matches.get(i).unwrap();
+            match pmatch.chars().nth(current_char_place) {
+                Some(pmatch_char) => {
+                    if current_char == '\0' {
+                        current_char = pmatch_char;
+                    } else if pmatch_char != current_char {
+                        break 'outer;
+                    }
+                }
+                None => break 'outer,
+            }
+        }
+        longest_common_prefix.push(current_char);
+        current_char_place += 1;
+    }
+
+    longest_common_prefix
 }
