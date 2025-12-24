@@ -1,6 +1,5 @@
 use std::fs::OpenOptions;
 use std::io::{self, Write};
-use std::ops::Deref;
 
 use anyhow::Result;
 use crossterm::cursor;
@@ -12,14 +11,31 @@ use crate::builtins::cd::cd_fn;
 use crate::builtins::pwd::pwd_fn;
 use crate::builtins::type_fn::type_fn;
 use crate::input::autocomplete::autocomplete;
+use crate::input::inputblock::InputBlock;
 use crate::subprocesses::utils::run_program;
 
-const PIPES: [&str; 6] = ["1>", ">", "2>", "1>>", ">>", "2>>"];
+const REDIRECTS: [&str; 6] = ["1>", ">", "2>", "1>>", ">>", "2>>"];
 
+#[derive(Clone, PartialEq)]
 pub enum Redirect {
     Stdout,
     Stderr,
+    Pipe,
     None,
+}
+
+#[derive(Clone)]
+pub enum RedirectType {
+    Create,
+    Append,
+    None,
+}
+
+#[derive(Clone)]
+pub struct RedirectOptions {
+    redirect: Redirect,
+    redirect_type: RedirectType,
+    redirect_location: String,
 }
 
 pub enum InputLoop {
@@ -43,103 +59,89 @@ pub fn handle_key_press(input: &mut String, key_event: KeyEvent) -> Result<Input
         (KeyCode::Enter, _) | (KeyCode::Char('j'), KeyModifiers::CONTROL) => {
             disable_raw_mode()?;
             println!();
-            let mut parsed_input = parse_input(input.trim());
+            let parsed_input = parse_input(input.trim());
+
             *input = String::new();
             if parsed_input.is_empty() {
                 return Ok(InputLoop::ContinueOuter);
             }
 
-            if parsed_input.len() == 1 {
-                if let Some(parsed_command) = parsed_input.first() {
-                    match parsed_command.deref() {
-                        "exit" => return Ok(InputLoop::Exit),
-                        "pwd" => pwd_fn()?,
-                        "" => {}
-                        _ => run_program(parsed_command, None, &mut None, &Redirect::None)?,
-                    }
-                }
-            } else {
-                let parsed_command = parsed_input.remove(0);
+            let mut previous_output = None;
+            for input_block in parsed_input {
+                let args = input_block.args;
 
-                if let Some((i, pipe)) = parsed_input
-                    .iter()
-                    .enumerate()
-                    .find(|(_, v)| PIPES.contains(&v.as_str()))
-                {
-                    let pipe_target = match parsed_input.get(i + 1) {
-                        Some(target) => target,
-                        None => {
-                            println!("No pipe target found");
+                let redirect = input_block.redirect_options.redirect;
+                let redirect_bool = redirect == Redirect::Stdout || redirect == Redirect::Stderr;
+                let redirect_location = input_block.redirect_options.redirect_location;
+                let mut fileoptions = OpenOptions::new();
+
+                if redirect_bool && redirect_location.is_empty() {
+                    println!("No redirect target found");
+                    return Ok(InputLoop::ContinueOuter);
+                }
+
+                if redirect_bool {
+                    match input_block.redirect_options.redirect_type {
+                        RedirectType::Create => {
+                            fileoptions.write(true).create(true);
+                        }
+                        RedirectType::Append => {
+                            fileoptions.write(true).create(true).append(true);
+                        }
+                        RedirectType::None => {
+                            println!("No redirect type found");
                             return Ok(InputLoop::ContinueOuter);
                         }
-                    };
-
-                    let mut redirect = Redirect::None;
-                    let mut fileoptions = OpenOptions::new();
-                    match pipe.as_str() {
-                        ">" | "1>" => {
-                            redirect = Redirect::Stdout;
-                            fileoptions.write(true).create(true);
-                        }
-                        ">>" | "1>>" => {
-                            redirect = Redirect::Stdout;
-                            fileoptions.write(true).create(true).append(true);
-                        }
-                        "2>" => {
-                            redirect = Redirect::Stderr;
-                            fileoptions.write(true).create(true);
-                        }
-                        "2>>" => {
-                            redirect = Redirect::Stderr;
-                            fileoptions.write(true).create(true).append(true);
-                        }
-                        _ => {}
-                    };
-
-                    let mut file = fileoptions.open(pipe_target)?;
-                    let mut buffer = vec![];
-
-                    let args = parsed_input.drain(0..i).collect::<Vec<String>>();
-                    match parsed_command.deref() {
-                        "echo" => {
-                            let mut echo = args.join(" ");
-                            match redirect {
-                                Redirect::Stdout => {
-                                    echo.push('\n');
-                                    buffer.write_all(echo.as_bytes())?;
-                                }
-                                _ => println!("{echo}"),
-                            }
-                        }
-                        "type" => type_fn(&args.join(" "), Some(&mut buffer), redirect)?,
-                        "cd" => cd_fn(Some(args), Some(&mut buffer), redirect)?,
-                        _ => run_program(
-                            &parsed_command,
-                            Some(args),
-                            &mut Some(&mut buffer),
-                            &redirect,
-                        )?,
-                    }
-
-                    file.write_all(&buffer)?;
-                } else {
-                    match parsed_command.deref() {
-                        "echo" => println!("{}", parsed_input.join(" ")),
-                        "type" => type_fn(&parsed_input.join(" "), None, Redirect::None)?,
-                        "cd" => cd_fn(Some(parsed_input), None, Redirect::None)?,
-                        _ => {
-                            run_program(
-                                &parsed_command,
-                                Some(parsed_input),
-                                &mut None,
-                                &Redirect::None,
-                            )?;
-                        }
                     }
                 }
-                return Ok(InputLoop::ContinueOuter);
+
+                let mut buffer = vec![];
+
+                match input_block.command.as_str() {
+                    "echo" => {
+                        let mut echo = args.join(" ");
+                        match redirect {
+                            Redirect::Stdout | Redirect::Pipe => {
+                                echo.push('\n');
+                                buffer.write_all(echo.as_bytes())?;
+                            }
+                            _ => println!("{echo}"),
+                        }
+                    }
+                    "exit" => return Ok(InputLoop::Exit),
+                    "pwd" => pwd_fn(Some(&mut buffer), &redirect)?,
+                    "type" => type_fn(&args.join(" "), Some(&mut buffer), &redirect)?,
+                    "cd" => cd_fn(Some(args), Some(&mut buffer), &redirect)?,
+                    "" => {}
+                    _ => run_program(
+                        &input_block.command,
+                        Some(args),
+                        previous_output,
+                        &mut Some(&mut buffer),
+                        &redirect,
+                    )?,
+                }
+
+                match redirect {
+                    Redirect::Stdout | Redirect::Stderr => {
+                        let mut file = fileoptions.open(redirect_location)?;
+                        file.write_all(&buffer)?;
+                        previous_output = None;
+                    }
+                    Redirect::Pipe => {
+                        previous_output = Some(String::from_utf8(buffer).unwrap());
+                    }
+                    Redirect::None => {
+                        previous_output = None;
+                    }
+                }
+
+                if input_block.piped {
+                    continue;
+                } else {
+                    return Ok(InputLoop::ContinueOuter);
+                }
             }
-            return Ok(InputLoop::ContinueOuter);
         }
         (KeyCode::Char(c), _) => {
             input.push(c);
@@ -152,12 +154,19 @@ pub fn handle_key_press(input: &mut String, key_event: KeyEvent) -> Result<Input
     Ok(InputLoop::ContinueInner)
 }
 
-pub fn parse_input(arguments: &str) -> Vec<String> {
+pub fn parse_input(arguments: &str) -> Vec<InputBlock> {
+    let mut input_blocks = vec![];
+    let mut parsed_command = String::new();
     let mut parsed_arguments = vec![];
+    let mut redirect = Redirect::None;
+    let mut redirect_type = RedirectType::None;
+    let mut redirect_location = String::new();
+
     let mut single_quotes = false;
     let mut double_quotes = false;
     let mut escape = false;
     let mut word = String::new();
+
     for char in arguments.chars() {
         match char {
             '\'' => {
@@ -196,7 +205,53 @@ pub fn parse_input(arguments: &str) -> Vec<String> {
                 if single_quotes || double_quotes || escape {
                     word.push(char);
                 } else if !word.is_empty() {
-                    parsed_arguments.push(word.clone());
+                    if parsed_command.is_empty() {
+                        parsed_command = word;
+                    } else if redirect != Redirect::None {
+                        redirect_location = word;
+                    } else {
+                        match word.as_str() {
+                            "|" => {
+                                let input_block = InputBlock::new(
+                                    parsed_command.clone(),
+                                    parsed_arguments.clone(),
+                                    RedirectOptions {
+                                        redirect: Redirect::Pipe,
+                                        redirect_type,
+                                        redirect_location: redirect_location.clone(),
+                                    },
+                                    true,
+                                );
+                                input_blocks.push(input_block);
+
+                                // Reset all for a new input block
+                                parsed_command = String::new();
+                                parsed_arguments = vec![];
+                                redirect = Redirect::None;
+                                redirect_type = RedirectType::None;
+                                redirect_location = String::new();
+                            }
+                            ">" | "1>" => {
+                                redirect = Redirect::Stdout;
+                                redirect_type = RedirectType::Create;
+                            }
+                            ">>" | "1>>" => {
+                                redirect = Redirect::Stdout;
+                                redirect_type = RedirectType::Append;
+                            }
+                            "2>" => {
+                                redirect = Redirect::Stderr;
+                                redirect_type = RedirectType::Create;
+                            }
+                            "2>>" => {
+                                redirect = Redirect::Stderr;
+                                redirect_type = RedirectType::Append;
+                            }
+                            _ => {
+                                parsed_arguments.push(word.clone());
+                            }
+                        }
+                    }
                     word = String::new();
                 }
             }
@@ -218,7 +273,25 @@ pub fn parse_input(arguments: &str) -> Vec<String> {
     }
     // push in whatever the last word was
     if !word.is_empty() {
-        parsed_arguments.push(word.clone());
+        if parsed_command.is_empty() {
+            parsed_command = word;
+        } else if redirect != Redirect::None {
+            redirect_location = word;
+        } else {
+            parsed_arguments.push(word.clone());
+        }
+
+        let input_block = InputBlock::new(
+            parsed_command,
+            parsed_arguments,
+            RedirectOptions {
+                redirect,
+                redirect_type,
+                redirect_location,
+            },
+            false,
+        );
+        input_blocks.push(input_block);
     }
-    parsed_arguments
+    input_blocks
 }

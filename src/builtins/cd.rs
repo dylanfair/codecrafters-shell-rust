@@ -9,7 +9,7 @@ use crate::input::utils::Redirect;
 pub fn cd_fn(
     directory: Option<Vec<String>>,
     buf: Option<&mut Vec<u8>>,
-    redirect: Redirect,
+    redirect: &Redirect,
 ) -> Result<()> {
     match directory {
         Some(dir) => {
@@ -28,7 +28,7 @@ pub fn cd_fn(
             } else {
                 let no_file_fail = format!("cd: {}: No such file or directory\n", dir);
                 match redirect {
-                    Redirect::Stderr => {
+                    Redirect::Stderr | Redirect::Pipe => {
                         let buffer = buf.expect("If redirecting we should have a file buffer");
                         buffer.write_all(no_file_fail.as_bytes())?;
                     }

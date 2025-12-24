@@ -26,7 +26,7 @@ pub fn path_search(
                 if verbose {
                     let exe_is_path = format!("{} is {}\n", command, path.display());
                     match redirect {
-                        Redirect::Stdout => {
+                        Redirect::Stdout | Redirect::Pipe => {
                             let buffer = buf.expect("If redirecting we should have a file buffer");
                             buffer.write_all(exe_is_path.as_bytes())?;
                         }
@@ -53,6 +53,7 @@ pub fn path_search(
 pub fn run_program(
     command: &str,
     arguments: Option<Vec<String>>,
+    piped_input: Option<String>,
     buf: &mut Option<&mut Vec<u8>>,
     redirect: &Redirect,
 ) -> Result<()> {
@@ -61,10 +62,13 @@ pub fn run_program(
         Some(_) => {
             let mut cmd = Command::new(command);
             match redirect {
-                Redirect::Stdout => cmd.stdout(Stdio::piped()),
+                Redirect::Stdout | Redirect::Pipe => cmd.stdout(Stdio::piped()),
                 Redirect::Stderr => cmd.stderr(Stdio::piped()),
                 Redirect::None => cmd.stdout(Stdio::inherit()),
             };
+            if piped_input.is_some() {
+                cmd.stdin(Stdio::piped());
+            }
 
             let mut handle = if let Some(arguments) = arguments {
                 cmd.args(arguments).spawn()?
@@ -72,9 +76,18 @@ pub fn run_program(
                 cmd.spawn()?
             };
 
+            if piped_input.is_some() {
+                let mut stdin = handle.stdin.take().expect("Failed to open stdin");
+                std::thread::spawn(move || {
+                    stdin
+                        .write_all(piped_input.unwrap().as_bytes())
+                        .expect("Failed to write to stdin");
+                });
+            }
+
             let mut output = Vec::new();
             match redirect {
-                Redirect::Stdout => {
+                Redirect::Stdout | Redirect::Pipe => {
                     let buffer = buf
                         .as_deref_mut()
                         .expect("If redirecting we should have a file buffer");
