@@ -1,6 +1,5 @@
 use std::env;
-use std::fs::File;
-use std::io::{BufWriter, Write};
+use std::io::Write;
 use std::path::Path;
 
 use anyhow::Result;
@@ -9,7 +8,7 @@ use crate::input::utils::Redirect;
 
 pub fn cd_fn(
     directory: Option<Vec<String>>,
-    buf: Option<&mut BufWriter<File>>,
+    buf: Option<&mut Vec<u8>>,
     redirect: Redirect,
 ) -> Result<()> {
     match directory {

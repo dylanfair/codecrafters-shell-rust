@@ -1,5 +1,5 @@
 use std::fs::OpenOptions;
-use std::io::{self, BufWriter, Write};
+use std::io::{self, Write};
 use std::ops::Deref;
 
 use anyhow::Result;
@@ -96,8 +96,8 @@ pub fn handle_key_press(input: &mut String, key_event: KeyEvent) -> Result<Input
                         _ => {}
                     };
 
-                    let file = fileoptions.open(pipe_target)?;
-                    let mut buffer = BufWriter::new(file);
+                    let mut file = fileoptions.open(pipe_target)?;
+                    let mut buffer = vec![];
 
                     let args = parsed_input.drain(0..i).collect::<Vec<String>>();
                     match parsed_command.deref() {
@@ -121,7 +121,7 @@ pub fn handle_key_press(input: &mut String, key_event: KeyEvent) -> Result<Input
                         )?,
                     }
 
-                    buffer.flush()?;
+                    file.write_all(&buffer)?;
                 } else {
                     match parsed_command.deref() {
                         "echo" => println!("{}", parsed_input.join(" ")),

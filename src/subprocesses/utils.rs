@@ -1,6 +1,5 @@
 use std::env;
-use std::fs::File;
-use std::io::{BufWriter, Read, Write};
+use std::io::{Read, Write};
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -12,7 +11,7 @@ use crate::input::utils::Redirect;
 pub fn path_search(
     command: &str,
     verbose: bool,
-    buf: Option<&mut BufWriter<File>>,
+    buf: Option<&mut Vec<u8>>,
     redirect: &Redirect,
 ) -> Result<Option<PathBuf>> {
     let path = env::var("PATH").unwrap();
@@ -54,7 +53,7 @@ pub fn path_search(
 pub fn run_program(
     command: &str,
     arguments: Option<Vec<String>>,
-    buf: &mut Option<&mut BufWriter<File>>,
+    buf: &mut Option<&mut Vec<u8>>,
     redirect: &Redirect,
 ) -> Result<()> {
     let exc_path = path_search(command, false, buf.as_deref_mut(), redirect)?;
