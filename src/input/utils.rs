@@ -14,9 +14,7 @@ use crate::input::autocomplete::autocomplete;
 use crate::input::inputblock::InputBlock;
 use crate::subprocesses::utils::run_program;
 
-const REDIRECTS: [&str; 6] = ["1>", ">", "2>", "1>>", ">>", "2>>"];
-
-#[derive(Clone, PartialEq)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum Redirect {
     Stdout,
     Stderr,
@@ -24,14 +22,14 @@ pub enum Redirect {
     None,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum RedirectType {
     Create,
     Append,
     None,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct RedirectOptions {
     redirect: Redirect,
     redirect_type: RedirectType,
@@ -69,6 +67,7 @@ pub fn handle_key_press(input: &mut String, key_event: KeyEvent) -> Result<Input
             let mut previous_output = None;
             for input_block in parsed_input {
                 let args = input_block.args;
+                let mut buffer = vec![];
 
                 let redirect = input_block.redirect_options.redirect;
                 let redirect_bool = redirect == Redirect::Stdout || redirect == Redirect::Stderr;
@@ -95,8 +94,6 @@ pub fn handle_key_press(input: &mut String, key_event: KeyEvent) -> Result<Input
                     }
                 }
 
-                let mut buffer = vec![];
-
                 match input_block.command.as_str() {
                     "echo" => {
                         let mut echo = args.join(" ");
@@ -113,27 +110,24 @@ pub fn handle_key_press(input: &mut String, key_event: KeyEvent) -> Result<Input
                     "type" => type_fn(&args.join(" "), Some(&mut buffer), &redirect)?,
                     "cd" => cd_fn(Some(args), Some(&mut buffer), &redirect)?,
                     "" => {}
-                    _ => run_program(
-                        &input_block.command,
-                        Some(args),
-                        previous_output,
-                        &mut Some(&mut buffer),
-                        &redirect,
-                    )?,
+                    _ => {
+                        let child_stdout = run_program(
+                            &input_block.command,
+                            Some(args),
+                            previous_output,
+                            &mut Some(&mut buffer),
+                            &redirect,
+                        )?;
+                        previous_output = child_stdout;
+                    }
                 }
 
                 match redirect {
                     Redirect::Stdout | Redirect::Stderr => {
                         let mut file = fileoptions.open(redirect_location)?;
                         file.write_all(&buffer)?;
-                        previous_output = None;
                     }
-                    Redirect::Pipe => {
-                        previous_output = Some(String::from_utf8(buffer).unwrap());
-                    }
-                    Redirect::None => {
-                        previous_output = None;
-                    }
+                    _ => {}
                 }
 
                 if input_block.piped {

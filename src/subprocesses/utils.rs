@@ -2,7 +2,7 @@ use std::env;
 use std::io::{Read, Write};
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::{ChildStdout, Command, Stdio};
 
 use anyhow::Result;
 
@@ -53,10 +53,10 @@ pub fn path_search(
 pub fn run_program(
     command: &str,
     arguments: Option<Vec<String>>,
-    piped_input: Option<String>,
+    piped_input: Option<ChildStdout>,
     buf: &mut Option<&mut Vec<u8>>,
     redirect: &Redirect,
-) -> Result<()> {
+) -> Result<Option<ChildStdout>> {
     let exc_path = path_search(command, false, buf.as_deref_mut(), redirect)?;
     match exc_path {
         Some(_) => {
@@ -66,8 +66,8 @@ pub fn run_program(
                 Redirect::Stderr => cmd.stderr(Stdio::piped()),
                 Redirect::None => cmd.stdout(Stdio::inherit()),
             };
-            if piped_input.is_some() {
-                cmd.stdin(Stdio::piped());
+            if let Some(childstdout) = piped_input {
+                cmd.stdin(childstdout);
             }
 
             let mut handle = if let Some(arguments) = arguments {
@@ -76,18 +76,13 @@ pub fn run_program(
                 cmd.spawn()?
             };
 
-            if piped_input.is_some() {
-                let mut stdin = handle.stdin.take().expect("Failed to open stdin");
-                std::thread::spawn(move || {
-                    stdin
-                        .write_all(piped_input.unwrap().as_bytes())
-                        .expect("Failed to write to stdin");
-                });
-            }
-
             let mut output = Vec::new();
             match redirect {
-                Redirect::Stdout | Redirect::Pipe => {
+                Redirect::Pipe => {
+                    let stdout = handle.stdout.expect("Should have an output");
+                    return Ok(Some(stdout));
+                }
+                Redirect::Stdout => {
                     let buffer = buf
                         .as_deref_mut()
                         .expect("If redirecting we should have a file buffer");
@@ -95,7 +90,7 @@ pub fn run_program(
                     stdout.read_to_end(&mut output)?;
                     buffer.write_all(&output)?;
 
-                    return Ok(());
+                    return Ok(None);
                 }
                 Redirect::Stderr => {
                     let buffer = buf
@@ -105,10 +100,11 @@ pub fn run_program(
                     stderr.read_to_end(&mut output)?;
                     buffer.write_all(&output)?;
 
-                    return Ok(());
+                    return Ok(None);
                 }
                 Redirect::None => {
                     handle.wait()?;
+                    return Ok(None);
                 }
             }
         }
@@ -125,5 +121,5 @@ pub fn run_program(
             }
         }
     }
-    Ok(())
+    Ok(None)
 }

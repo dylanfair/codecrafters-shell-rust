@@ -1,6 +1,6 @@
 use crate::input::utils::RedirectOptions;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct InputBlock {
     pub command: String,
     pub args: Vec<String>,
