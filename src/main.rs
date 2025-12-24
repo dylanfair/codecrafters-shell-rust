@@ -4,7 +4,7 @@ use std::ops::Deref;
 
 use anyhow::Result;
 use crossterm::cursor;
-use crossterm::event::{Event, KeyCode, read};
+use crossterm::event::{Event, KeyCode, KeyModifiers, read};
 use crossterm::terminal::{Clear, ClearType, disable_raw_mode, enable_raw_mode};
 use crossterm::{cursor::MoveToColumn, execute};
 
@@ -38,23 +38,18 @@ fn main() -> Result<()> {
 
         loop {
             if let Ok(Event::Key(key_event)) = read() {
-                match key_event.code {
-                    KeyCode::Char(c) => {
-                        input.push(c);
-                        print!("{c}");
-                        io::stdout().flush().expect("Could not character");
-                    }
-                    KeyCode::Backspace => {
+                match (key_event.code, key_event.modifiers) {
+                    (KeyCode::Backspace, _) => {
                         if !input.is_empty() {
                             execute!(io::stdout(), cursor::MoveLeft(1))?;
                             execute!(io::stdout(), Clear(ClearType::UntilNewLine))?;
                         }
                         input.pop();
                     }
-                    KeyCode::Tab => {
+                    (KeyCode::Tab, _) => {
                         autocomplete(&mut input);
                     }
-                    KeyCode::Enter => {
+                    (KeyCode::Enter, _) | (KeyCode::Char('j'), KeyModifiers::CONTROL) => {
                         disable_raw_mode()?;
                         println!();
                         let mut parsed_input = parse_input(input.trim());
@@ -163,6 +158,11 @@ fn main() -> Result<()> {
                             continue 'outer;
                         }
                         continue 'outer;
+                    }
+                    (KeyCode::Char(c), _) => {
+                        input.push(c);
+                        print!("{c}");
+                        io::stdout().flush().expect("Could not character");
                     }
                     _ => {}
                 }
