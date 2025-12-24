@@ -47,7 +47,7 @@ fn main() -> Result<()> {
                         input.pop();
                     }
                     (KeyCode::Tab, _) => {
-                        autocomplete(&mut input);
+                        autocomplete(&mut input)?;
                     }
                     (KeyCode::Enter, _) | (KeyCode::Char('j'), KeyModifiers::CONTROL) => {
                         disable_raw_mode()?;
