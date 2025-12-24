@@ -1,4 +1,4 @@
-use crate::Redirect;
+use crate::input::utils::Redirect;
 use std::fs::File;
 use std::io::{BufWriter, Write};
 

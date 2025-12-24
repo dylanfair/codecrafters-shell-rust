@@ -9,6 +9,8 @@ use anyhow::Result;
 use crossterm::event::{Event, KeyCode, read};
 use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
 
+use crate::input::utils::{InputLoop, handle_key_press};
+
 const BUILTINS: [&str; 5] = ["echo", "exit", "type", "cd", "pwd"];
 
 fn push_completed(completed: &str, current_input: &mut String) {
@@ -22,7 +24,7 @@ fn push_completed(completed: &str, current_input: &mut String) {
     io::stdout().flush().expect("Could not flush autocomplete");
 }
 
-pub fn autocomplete(current_input: &mut String) -> Result<()> {
+pub fn autocomplete(current_input: &mut String) -> Result<InputLoop> {
     let mut potential_matches: Vec<String> = vec![];
 
     // First check builtins
@@ -60,7 +62,8 @@ pub fn autocomplete(current_input: &mut String) -> Result<()> {
         print!("\x07");
         io::stdout().flush().expect("Could not flush bell");
 
-        let longest_common_prefix = find_longest_common_prefix(&potential_matches, current_input);
+        let longest_common_prefix =
+            find_longest_common_prefix(&potential_matches, current_input.len());
         if !longest_common_prefix.is_empty() {
             current_input.push_str(&longest_common_prefix);
             print!("{longest_common_prefix}");
@@ -69,29 +72,33 @@ pub fn autocomplete(current_input: &mut String) -> Result<()> {
                 .expect("Could not flush longest_common_prefix");
         }
 
-        if let Ok(Event::Key(key_event)) = read()
-            && key_event.code == KeyCode::Tab
-        {
-            potential_matches.sort();
-            let potential_commands = potential_matches.join("  ");
-            disable_raw_mode()?;
-            println!();
-            println!("{potential_commands}");
-            print!("$ {current_input}");
-            io::stdout().flush().expect("Could not flush bell");
-            enable_raw_mode()?;
+        if let Ok(Event::Key(key_event)) = read() {
+            if key_event.code == KeyCode::Tab {
+                potential_matches.sort();
+                let potential_commands = potential_matches.join("  ");
+                disable_raw_mode()?;
+                println!();
+                println!("{potential_commands}");
+                print!("$ {current_input}");
+                io::stdout()
+                    .flush()
+                    .expect("Could not flush potential commands");
+                enable_raw_mode()?;
+            } else {
+                return handle_key_press(current_input, key_event);
+            }
         }
     } else {
         print!("\x07");
         io::stdout().flush().expect("Could not flush bell");
     }
 
-    Ok(())
+    Ok(InputLoop::ContinueInner)
 }
 
-fn find_longest_common_prefix(potential_matches: &[String], current_input: &str) -> String {
+fn find_longest_common_prefix(potential_matches: &[String], start_from: usize) -> String {
     let mut longest_common_prefix = String::new();
-    let mut current_char_place = current_input.len();
+    let mut current_char_place = start_from;
 
     'outer: loop {
         let mut current_char = '\0';

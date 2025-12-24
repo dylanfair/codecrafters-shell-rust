@@ -7,7 +7,7 @@ use std::process::{Command, Stdio};
 
 use anyhow::Result;
 
-use crate::Redirect;
+use crate::input::utils::Redirect;
 
 pub fn path_search(
     command: &str,

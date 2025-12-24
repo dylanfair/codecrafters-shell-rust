@@ -5,7 +5,7 @@ use std::path::Path;
 
 use anyhow::Result;
 
-use crate::Redirect;
+use crate::input::utils::Redirect;
 
 pub fn cd_fn(
     directory: Option<Vec<String>>,
