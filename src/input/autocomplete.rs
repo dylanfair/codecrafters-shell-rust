@@ -11,6 +11,8 @@ pub fn autocomplete(current_input: &mut String) {
                 current_input.push(char);
                 print!("{char}");
             }
+            current_input.push(' ');
+            print!(" ");
         }
     }
     io::stdout().flush().expect("Could not flush autocomplete");
