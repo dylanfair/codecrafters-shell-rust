@@ -12,7 +12,7 @@ use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
 use crate::builtins::history::History;
 use crate::input::utils::{InputLoop, handle_key_press};
 
-const BUILTINS: [&str; 5] = ["echo", "exit", "type", "cd", "pwd"];
+const BUILTINS: [&str; 6] = ["echo", "exit", "type", "cd", "pwd", "history"];
 
 fn push_completed(completed: &str, current_input: &mut String) {
     let to_push = completed.replace(current_input.as_str(), "");

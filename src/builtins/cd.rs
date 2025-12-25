@@ -23,7 +23,7 @@ pub fn cd_fn(directory: Vec<String>, buf: Option<&mut Vec<u8>>, redirect: &Redir
         } else {
             let no_file_fail = format!("cd: {}: No such file or directory\n", dir);
             match redirect {
-                Redirect::Stderr | Redirect::Pipe => {
+                Redirect::Stderr => {
                     let buffer = buf.expect("If redirecting we should have a file buffer");
                     buffer.write_all(no_file_fail.as_bytes())?;
                 }
