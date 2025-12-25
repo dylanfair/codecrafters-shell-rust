@@ -12,13 +12,13 @@ impl History {
     pub fn new() -> History {
         History {
             list: vec![],
-            position: 0, // Start at 1 so our up and down math works fine
+            position: 0,
         }
     }
 
     pub fn add_entry(&mut self, entry: String) {
         self.list.push(entry);
-        self.position += 1;
+        self.position = self.list.len();
     }
 
     pub fn move_up(&mut self) -> Option<&String> {
