@@ -90,7 +90,6 @@ pub fn history_fn(
                     for line in &history.list {
                         writeln!(file_handler, "{line}")?;
                     }
-                    writeln!(file_handler)?;
                 }
                 None => {
                     let missing_file = "Need to be sent a file\n";
@@ -113,7 +112,6 @@ pub fn history_fn(
                         let entry = history.list.get(i).expect("getting within lsit len");
                         writeln!(file_handler, "{entry}")?;
                     }
-                    writeln!(file_handler)?;
                     history.append_start = history.list.len();
                 }
                 None => {
