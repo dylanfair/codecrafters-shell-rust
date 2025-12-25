@@ -20,9 +20,10 @@ pub fn path_search(
     redirect: &Redirect,
 ) -> Result<Option<PathBuf>> {
     let path = env::var("PATH").unwrap();
-    let dirs = path.split(":");
+    let dirs = env::split_paths(&path);
+
     for dir in dirs {
-        let path_str = format!("{dir}/{command}");
+        let path_str = format!("{}/{command}", dir.display());
         let path = Path::new(&path_str);
         if path.exists() {
             let permissions = path.metadata()?.permissions();
@@ -42,6 +43,7 @@ pub fn path_search(
             }
         }
     }
+
     if verbose {
         let not_found = format!("{}: not found\n", command);
         match redirect {
