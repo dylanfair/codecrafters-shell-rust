@@ -14,7 +14,10 @@ mod subprocesses;
 
 fn main() -> Result<()> {
     let mut input = String::new();
-    let mut history = History::new();
+    let mut history = match History::read_from_env() {
+        Ok(history) => history,
+        Err(_) => History::new(),
+    };
 
     'outer: loop {
         execute!(io::stdout(), MoveToColumn(0))?;
@@ -34,5 +37,6 @@ fn main() -> Result<()> {
             }
         }
     }
+    history.write_to_env()?;
     Ok(())
 }

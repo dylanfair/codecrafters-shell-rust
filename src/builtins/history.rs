@@ -1,4 +1,5 @@
 use crate::input::utils::Redirect;
+use std::env;
 use std::{
     fs::{self, OpenOptions},
     io::Write,
@@ -19,6 +20,37 @@ impl History {
             position: 0,
             append_start: 0,
         }
+    }
+
+    pub fn read_from_env() -> Result<History> {
+        let histpath = env::var("HISTFILE")?;
+        let file = fs::read_to_string(histpath)?;
+
+        let mut history_list = vec![];
+        for line in file.lines() {
+            history_list.push(line.to_string());
+        }
+
+        Ok(History {
+            position: history_list.len(),
+            append_start: history_list.len(),
+            list: history_list,
+        })
+    }
+
+    pub fn write_to_env(&mut self) -> Result<()> {
+        let histpath = env::var("HISTFILE")?;
+        let mut file = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(histpath)?;
+
+        for i in self.append_start..self.list.len() {
+            let entry = self.list.get(i).expect("getting within list len");
+            writeln!(file, "{entry}")?;
+        }
+        self.append_start = self.list.len();
+        Ok(())
     }
 
     pub fn add_entry(&mut self, entry: String) {
@@ -109,7 +141,7 @@ pub fn history_fn(
                         OpenOptions::new().create(true).append(true).open(file)?;
 
                     for i in history.append_start..history.list.len() {
-                        let entry = history.list.get(i).expect("getting within lsit len");
+                        let entry = history.list.get(i).expect("getting within list len");
                         writeln!(file_handler, "{entry}")?;
                     }
                     history.append_start = history.list.len();
