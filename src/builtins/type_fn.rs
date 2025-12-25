@@ -7,7 +7,7 @@ use anyhow::Result;
 
 pub fn type_fn(command: &str, buf: Option<&mut Vec<u8>>, redirect: &Redirect) -> Result<()> {
     match command {
-        "echo" | "type" | "exit" | "pwd" | "cd" => {
+        "echo" | "type" | "exit" | "pwd" | "cd" | "history" => {
             let shell_builtin = format!("{} is a shell builtin\n", command);
             match redirect {
                 Redirect::Stdout | Redirect::Pipe => {

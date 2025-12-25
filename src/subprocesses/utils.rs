@@ -57,7 +57,7 @@ pub fn path_search(
 
 pub fn run_program(
     command: &str,
-    arguments: Option<Vec<String>>,
+    arguments: Vec<String>,
     piped_input: Option<OutputHandle>,
     buf: &mut Option<&mut Vec<u8>>,
     redirect: &Redirect,
@@ -88,7 +88,7 @@ pub fn run_program(
                 vec![]
             };
 
-            let mut handle = if let Some(arguments) = arguments {
+            let mut handle = if !arguments.is_empty() {
                 cmd.args(arguments).spawn()?
             } else {
                 cmd.spawn()?

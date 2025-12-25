@@ -8,6 +8,7 @@ use crossterm::execute;
 use crossterm::terminal::{Clear, ClearType, disable_raw_mode};
 
 use crate::builtins::cd::cd_fn;
+use crate::builtins::history::history_fn;
 use crate::builtins::pwd::pwd_fn;
 use crate::builtins::type_fn::type_fn;
 use crate::input::autocomplete::autocomplete;
@@ -42,7 +43,11 @@ pub enum InputLoop {
     Exit,
 }
 
-pub fn handle_key_press(input: &mut String, key_event: KeyEvent) -> Result<InputLoop> {
+pub fn handle_key_press(
+    input: &mut String,
+    key_event: KeyEvent,
+    history: &mut Vec<String>,
+) -> Result<InputLoop> {
     match (key_event.code, key_event.modifiers) {
         (KeyCode::Backspace, _) => {
             if !input.is_empty() {
@@ -52,11 +57,16 @@ pub fn handle_key_press(input: &mut String, key_event: KeyEvent) -> Result<Input
             input.pop();
         }
         (KeyCode::Tab, _) => {
-            return autocomplete(input);
+            return autocomplete(input, history);
         }
         (KeyCode::Enter, _) | (KeyCode::Char('j'), KeyModifiers::CONTROL) => {
             disable_raw_mode()?;
             println!();
+
+            // Update our history
+            history.push(input.trim().to_string());
+
+            // Parse the input
             let parsed_input = parse_input(input.trim());
 
             *input = String::new();
@@ -105,15 +115,16 @@ pub fn handle_key_press(input: &mut String, key_event: KeyEvent) -> Result<Input
                             _ => println!("{echo}"),
                         }
                     }
+                    "history" => history_fn(history, args, Some(&mut buffer), &redirect)?,
                     "exit" => return Ok(InputLoop::Exit),
                     "pwd" => pwd_fn(Some(&mut buffer), &redirect)?,
                     "type" => type_fn(&args.join(" "), Some(&mut buffer), &redirect)?,
-                    "cd" => cd_fn(Some(args), Some(&mut buffer), &redirect)?,
+                    "cd" => cd_fn(args, Some(&mut buffer), &redirect)?,
                     "" => {}
                     _ => {
                         let child_stdout = run_program(
                             &input_block.command,
-                            Some(args),
+                            args,
                             previous_output,
                             &mut Some(&mut buffer),
                             &redirect,

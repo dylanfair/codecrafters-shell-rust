@@ -24,7 +24,7 @@ fn push_completed(completed: &str, current_input: &mut String) {
     io::stdout().flush().expect("Could not flush autocomplete");
 }
 
-pub fn autocomplete(current_input: &mut String) -> Result<InputLoop> {
+pub fn autocomplete(current_input: &mut String, history: &mut Vec<String>) -> Result<InputLoop> {
     let mut potential_matches: Vec<String> = vec![];
 
     // First check builtins
@@ -85,7 +85,7 @@ pub fn autocomplete(current_input: &mut String) -> Result<InputLoop> {
                     .expect("Could not flush potential commands");
                 enable_raw_mode()?;
             } else {
-                return handle_key_press(current_input, key_event);
+                return handle_key_press(current_input, key_event, history);
             }
         }
     } else {

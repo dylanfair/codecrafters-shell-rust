@@ -13,6 +13,8 @@ mod subprocesses;
 
 fn main() -> Result<()> {
     let mut input = String::new();
+    let mut history = vec![];
+
     'outer: loop {
         execute!(io::stdout(), MoveToColumn(0))?;
         print!("$ ");
@@ -22,7 +24,7 @@ fn main() -> Result<()> {
 
         loop {
             if let Ok(Event::Key(key_event)) = read() {
-                let inputloop = handle_key_press(&mut input, key_event)?;
+                let inputloop = handle_key_press(&mut input, key_event, &mut history)?;
                 match inputloop {
                     InputLoop::ContinueOuter => continue 'outer,
                     InputLoop::ContinueInner => {}
