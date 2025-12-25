@@ -2,13 +2,13 @@ use std::fs::OpenOptions;
 use std::io::{self, Write};
 
 use anyhow::Result;
-use crossterm::cursor;
+use crossterm::cursor::{self, MoveToColumn};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use crossterm::execute;
 use crossterm::terminal::{Clear, ClearType, disable_raw_mode};
 
 use crate::builtins::cd::cd_fn;
-use crate::builtins::history::history_fn;
+use crate::builtins::history::{History, history_fn};
 use crate::builtins::pwd::pwd_fn;
 use crate::builtins::type_fn::type_fn;
 use crate::input::autocomplete::autocomplete;
@@ -46,9 +46,31 @@ pub enum InputLoop {
 pub fn handle_key_press(
     input: &mut String,
     key_event: KeyEvent,
-    history: &mut Vec<String>,
+    history: &mut History,
 ) -> Result<InputLoop> {
     match (key_event.code, key_event.modifiers) {
+        (KeyCode::Up, _) => {
+            match history.move_up() {
+                Some(entry) => *input = entry.clone(),
+                None => *input = String::new(),
+            }
+
+            execute!(io::stdout(), MoveToColumn(0))?;
+            execute!(io::stdout(), Clear(ClearType::CurrentLine))?;
+            print!("$ {input}");
+            io::stdout().flush().expect("Could not history up");
+        }
+        (KeyCode::Down, _) => {
+            match history.move_down() {
+                Some(entry) => *input = entry.clone(),
+                None => *input = String::new(),
+            }
+
+            execute!(io::stdout(), MoveToColumn(0))?;
+            execute!(io::stdout(), Clear(ClearType::CurrentLine))?;
+            print!("$ {input}");
+            io::stdout().flush().expect("Could not history down");
+        }
         (KeyCode::Backspace, _) => {
             if !input.is_empty() {
                 execute!(io::stdout(), cursor::MoveLeft(1))?;
@@ -64,7 +86,7 @@ pub fn handle_key_press(
             println!();
 
             // Update our history
-            history.push(input.trim().to_string());
+            history.add_entry(input.trim().to_string());
 
             // Parse the input
             let parsed_input = parse_input(input.trim());

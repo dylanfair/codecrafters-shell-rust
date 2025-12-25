@@ -3,8 +3,44 @@ use std::io::Write;
 
 use anyhow::Result;
 
+pub struct History {
+    list: Vec<String>,
+    position: usize,
+}
+
+impl History {
+    pub fn new() -> History {
+        History {
+            list: vec![],
+            position: 0, // Start at 1 so our up and down math works fine
+        }
+    }
+
+    pub fn add_entry(&mut self, entry: String) {
+        self.list.push(entry);
+        self.position += 1;
+    }
+
+    pub fn move_up(&mut self) -> Option<&String> {
+        if self.position == 0 {
+            return None;
+        }
+        self.position = self.position.saturating_sub(1);
+        self.list.get(self.position)
+    }
+
+    pub fn move_down(&mut self) -> Option<&String> {
+        self.position = self.position.saturating_add(1);
+        if self.position > self.list.len() {
+            self.position = self.list.len();
+            return None;
+        }
+        self.list.get(self.position)
+    }
+}
+
 pub fn history_fn(
-    history: &mut [String],
+    history: &mut History,
     arguments: Vec<String>,
     buf: Option<&mut Vec<u8>>,
     redirect: &Redirect,
@@ -12,7 +48,7 @@ pub fn history_fn(
     let mut history_display = String::new();
 
     if arguments.is_empty() {
-        for (i, command) in history.iter().enumerate() {
+        for (i, command) in history.list.iter().enumerate() {
             history_display.push_str(&format!("  {}  {command}\n", i + 1));
         }
     } else {
@@ -20,10 +56,10 @@ pub fn history_fn(
 
         match history_n.parse::<usize>() {
             Ok(history_n) => {
-                if history_n > history.len() {
+                if history_n > history.list.len() {
                     let history_n_too_large = format!(
                         "Number provided is larger than current history: {}\n",
-                        history.len()
+                        history.list.len()
                     );
                     match redirect {
                         Redirect::Stderr => {
@@ -35,8 +71,9 @@ pub fn history_fn(
                     return Ok(());
                 }
 
-                for i in history.len() - history_n..history.len() {
+                for i in history.list.len() - history_n..history.list.len() {
                     let command = history
+                        .list
                         .get(i)
                         .expect("Should be here since we checked length");
                     history_display.push_str(&format!(" {}  {command}\n", i + 1));

@@ -5,6 +5,7 @@ use crossterm::event::{Event, read};
 use crossterm::terminal::enable_raw_mode;
 use crossterm::{cursor::MoveToColumn, execute};
 
+use crate::builtins::history::History;
 use crate::input::utils::{InputLoop, handle_key_press};
 
 mod builtins;
@@ -13,7 +14,7 @@ mod subprocesses;
 
 fn main() -> Result<()> {
     let mut input = String::new();
-    let mut history = vec![];
+    let mut history = History::new();
 
     'outer: loop {
         execute!(io::stdout(), MoveToColumn(0))?;

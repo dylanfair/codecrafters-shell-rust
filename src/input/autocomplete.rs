@@ -9,6 +9,7 @@ use anyhow::Result;
 use crossterm::event::{Event, KeyCode, read};
 use crossterm::terminal::{disable_raw_mode, enable_raw_mode};
 
+use crate::builtins::history::History;
 use crate::input::utils::{InputLoop, handle_key_press};
 
 const BUILTINS: [&str; 5] = ["echo", "exit", "type", "cd", "pwd"];
@@ -24,7 +25,7 @@ fn push_completed(completed: &str, current_input: &mut String) {
     io::stdout().flush().expect("Could not flush autocomplete");
 }
 
-pub fn autocomplete(current_input: &mut String, history: &mut Vec<String>) -> Result<InputLoop> {
+pub fn autocomplete(current_input: &mut String, history: &mut History) -> Result<InputLoop> {
     let mut potential_matches: Vec<String> = vec![];
 
     // First check builtins
