@@ -12,7 +12,7 @@ use crate::builtins::pwd::pwd_fn;
 use crate::builtins::type_fn::type_fn;
 use crate::input::autocomplete::autocomplete;
 use crate::input::inputblock::InputBlock;
-use crate::subprocesses::utils::run_program;
+use crate::subprocesses::utils::{OutputHandle, run_program};
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum Redirect {
@@ -126,6 +126,11 @@ pub fn handle_key_press(input: &mut String, key_event: KeyEvent) -> Result<Input
                     Redirect::Stdout | Redirect::Stderr => {
                         let mut file = fileoptions.open(redirect_location)?;
                         file.write_all(&buffer)?;
+                    }
+                    Redirect::Pipe => {
+                        if previous_output.is_none() && !buffer.is_empty() {
+                            previous_output = Some(OutputHandle::ChildBuffer(buffer.clone()));
+                        }
                     }
                     _ => {}
                 }

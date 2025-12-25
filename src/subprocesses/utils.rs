@@ -8,6 +8,11 @@ use anyhow::Result;
 
 use crate::input::utils::Redirect;
 
+pub enum OutputHandle {
+    ChildPipe(ChildStdout),
+    ChildBuffer(Vec<u8>),
+}
+
 pub fn path_search(
     command: &str,
     verbose: bool,
@@ -53,10 +58,10 @@ pub fn path_search(
 pub fn run_program(
     command: &str,
     arguments: Option<Vec<String>>,
-    piped_input: Option<ChildStdout>,
+    piped_input: Option<OutputHandle>,
     buf: &mut Option<&mut Vec<u8>>,
     redirect: &Redirect,
-) -> Result<Option<ChildStdout>> {
+) -> Result<Option<OutputHandle>> {
     let exc_path = path_search(command, false, buf.as_deref_mut(), redirect)?;
     match exc_path {
         Some(_) => {
@@ -66,9 +71,22 @@ pub fn run_program(
                 Redirect::Stderr => cmd.stderr(Stdio::piped()),
                 Redirect::None => cmd.stdout(Stdio::inherit()),
             };
-            if let Some(childstdout) = piped_input {
-                cmd.stdin(childstdout);
-            }
+
+            let childbuffer = if let Some(outputhandle) = piped_input {
+                match outputhandle {
+                    OutputHandle::ChildPipe(childstdout) => {
+                        let childst = childstdout;
+                        cmd.stdin(childst);
+                        vec![]
+                    }
+                    OutputHandle::ChildBuffer(childbuffer) => {
+                        cmd.stdin(Stdio::piped());
+                        childbuffer
+                    }
+                }
+            } else {
+                vec![]
+            };
 
             let mut handle = if let Some(arguments) = arguments {
                 cmd.args(arguments).spawn()?
@@ -76,11 +94,17 @@ pub fn run_program(
                 cmd.spawn()?
             };
 
+            if !childbuffer.is_empty() {
+                let mut stdin = handle.stdin.take().expect("Failed to open stdin");
+                stdin.write_all(&childbuffer)?;
+                drop(stdin);
+            }
+
             let mut output = Vec::new();
             match redirect {
                 Redirect::Pipe => {
                     let stdout = handle.stdout.expect("Should have an output");
-                    return Ok(Some(stdout));
+                    return Ok(Some(OutputHandle::ChildPipe(stdout)));
                 }
                 Redirect::Stdout => {
                     let buffer = buf
