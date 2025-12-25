@@ -37,6 +37,6 @@ fn main() -> Result<()> {
             }
         }
     }
-    history.write_to_env()?;
+    let _ = history.write_to_env().is_ok();
     Ok(())
 }
