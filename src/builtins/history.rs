@@ -81,8 +81,11 @@ pub fn history_fn(
             },
             "-w" => match arguments.get(1) {
                 Some(file) => {
-                    let mut file_handler =
-                        OpenOptions::new().truncate(true).create(true).open(file)?;
+                    let mut file_handler = OpenOptions::new()
+                        .write(true)
+                        .create(true)
+                        .truncate(true)
+                        .open(file)?;
 
                     for line in &history.list {
                         writeln!(file_handler, "{line}")?;
